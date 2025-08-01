@@ -1,12 +1,11 @@
-import fitz
-from sentence_transformers import SentenceTransformer
-import faiss
-import numpy as np
-# --- CHANGE 1: Import ModelInference instead of Model ---
-from ibm_watsonx_ai.foundation_models import ModelInference
-import os
-from dotenv import load_dotenv
-import traceback
+import fitz #for pdf open nd read
+from sentence_transformers import SentenceTransformer #convert text to vectors
+import faiss #serach for vectors similarty
+import numpy as np #work with arrays
+from ibm_watsonx_ai.foundation_models import ModelInference #ibmmodel
+import os #read environment variables, paths
+from dotenv import load_dotenv #to get env
+import traceback #debugging
 
 load_dotenv()
 
@@ -14,7 +13,7 @@ llm_model = None
 embedding_model = None
 try:
     print("--> Initializing embedding model...")
-    embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+    embedding_model = SentenceTransformer('all-MiniLM-L6-v2') # turns text into vectors 
     print("--> Embedding model initialized.")
 
     print("--> Loading Watsonx credentials...")
@@ -50,10 +49,9 @@ except Exception:
     traceback.print_exc()
     print("="*50 + "\n\n")
 
-# ... (the rest of the file remains the same) ...
 
+#take all pdfs and reach each and extrct all text into a large string and returns in it 
 def extract_text_from_pdfs(pdf_files):
-    """Extracts text from a list of uploaded PDF files."""
     full_text = ""
     for pdf_file in pdf_files:
         doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
@@ -62,8 +60,10 @@ def extract_text_from_pdfs(pdf_files):
         doc.close()
     return full_text
 
+# Returns a list of these chunks.
+
+#long textt splited into small pices and overlap and return list
 def chunk_text(text, chunk_size=500, overlap=100):
-    """Splits text into overlapping chunks."""
     words = text.split()
     if not words:
         return []
@@ -73,6 +73,8 @@ def chunk_text(text, chunk_size=500, overlap=100):
         chunks.append(chunk)
     return chunks
 
+
+#the list (chunks) and use model to convert into vector and use faiss to create index and return index and array 
 def create_embeddings_and_index(chunks):
     """Creates embeddings for text chunks and builds a FAISS index."""
     if not chunks or not embedding_model:
@@ -87,8 +89,9 @@ def create_embeddings_and_index(chunks):
         print(f"Error creating embeddings or FAISS index: {e}")
         return None, None
 
+#serached quey go as input and using the faiss most relevant chunk is returned
 def retrieve_relevant_chunks(query, index, chunks, top_k=3):
-    """Retrieves the most relevant chunks for a given query from the FAISS index."""
+    
     if not query or index is None or not embedding_model:
         return []
     try:
@@ -102,11 +105,12 @@ def retrieve_relevant_chunks(query, index, chunks, top_k=3):
         print(f"Error during chunk retrieval: {e}")
         return []
 
+#building a prompt with context(chunks) and query
 def construct_prompt(query, context_chunks):
     """Constructs the prompt for the LLM with context and instructions."""
     context = "\n\n".join(context_chunks)
     prompt = f"""
-    Answer the following question based only on the provided context. If the context does not contain the answer, state that the information is not available in the provided documents. Do not use any external knowledge.
+    Answer the following question based only on the provided context. If the context does not contain the answer, state that the information is not available in the provided documents. Use External Knowledge if realted info found else do not use any external knowledge.
 
     Context:
     {context}
@@ -117,8 +121,10 @@ def construct_prompt(query, context_chunks):
     """
     return prompt
 
+
+#sends the prompt to the Watsonx LLM to get a generated answer
 def get_llm_answer(query, context_chunks):
-    """Gets a final answer from the Watsonx LLM."""
+   
     if not llm_model:
         return "Error: LLM model could not be initialized. Please check the terminal logs for the detailed error message."
     

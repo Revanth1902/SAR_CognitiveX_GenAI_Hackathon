@@ -7,124 +7,166 @@ from utils import (
     get_llm_answer
 )
 
-# --------------------------------------------------------------------------
-# 1. PAGE CONFIGURATION
-# --------------------------------------------------------------------------
+# Inject dark theme and button styles via CSS
+def local_css():
+    st.markdown(
+        """
+        <style>
+        /* Background and text */
+        .main {
+            background-color: #121212;
+            color: #e0e0e0;
+        }
+        .css-1d391kg {
+            background-color: #121212 !important;
+            color: #e0e0e0 !important;
+        }
+        /* Sidebar */
+        [data-testid="stSidebar"] {
+            background-color: #14213d;
+            color: #e0e0e0;
+        }
+        /* Headers */
+        h1, h2, h3, h4, h5, h6 {
+            color: #bb86fc !important;
+        }
+        p{
+        color: red !important;
+        }
+        /* Buttons */
+        div.stButton > button {
+            background-color: #26b170!im;
+            color: white;
+            border-radius: 8px;
+            border: none;
+            padding: 8px 16px;
+            font-weight: 600;
+            transition: background-color 0.3s ease;
+            box-shadow: 0 2px 5px rgba(55,0,179,0.4);
+        }
+        div.stButton > button:hover {
+            background-color: #6200ee;
+            color: white;
+        }
+        /* Inputs */
+        textarea, input[type="text"] {
+            background-color: #1e1e1e;
+            color: #e0e0e0;
+            border: 1px solid #bb86fc;
+            border-radius: 6px;
+            padding: 8px;
+        }
+        /* Expanders */
+        div[role="button"] {
+            background-color: #2a2a2a !important;
+            color: #bb86fc !important;
+            border-radius: 6px;
+            padding: 4px 12px;
+        }
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #121212;
+        }
+        ::-webkit-scrollbar-thumb {
+            background-color: #bb86fc;
+            border-radius: 4px;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+local_css()
+
 st.set_page_config(
     page_title="StudyMate AI",
     page_icon="📚",
     layout="wide"
 )
 
-# --------------------------------------------------------------------------
-# 2. SESSION STATE INITIALIZATION
-# --------------------------------------------------------------------------
-# Ensures that variables persist across user interactions (reruns).
 if "qa_history" not in st.session_state:
     st.session_state.qa_history = []
 if "processed_data" not in st.session_state:
     st.session_state.processed_data = None
 
-
-# --------------------------------------------------------------------------
-# 3. SIDEBAR FOR DOCUMENT UPLOAD
-# --------------------------------------------------------------------------
 with st.sidebar:
-    st.header("Upload Your Documents")
-    st.markdown("""
-    Upload your academic papers, textbooks, or notes in PDF format. 
-    After uploading, click the **Process Documents** button.
-    """)
-    
-    uploaded_files = st.file_uploader(
-        "Choose one or more PDF files",
-        type="pdf",
-        accept_multiple_files=True
-    )
+    st.header("📂 Upload PDFs")
+    st.write("Upload your academic papers or notes as PDFs. Then click **Process Documents**.")
 
-    if st.button("Process Documents"):
+    uploaded_files = st.file_uploader(
+        "Select one or more PDF files",
+        type="pdf",
+        accept_multiple_files=True,
+        help="You can upload multiple PDFs at once."
+    )
+    
+    with st.form(key="process_form", clear_on_submit=False):
+        process_btn = st.form_submit_button("Process Documents")
+    
+    if process_btn:
         if uploaded_files:
-            with st.spinner("Processing documents... This may take a few moments."):
-                # Core processing pipeline
+            with st.spinner("Processing documents, please wait..."):
                 raw_text = extract_text_from_pdfs(uploaded_files)
                 text_chunks = chunk_text(raw_text)
                 faiss_index, _ = create_embeddings_and_index(text_chunks)
-                
-                # Store processed data in session state
-                if faiss_index is not None:
+
+                if faiss_index:
                     st.session_state.processed_data = {
                         "text_chunks": text_chunks,
                         "faiss_index": faiss_index
                     }
-                    st.success("Documents processed successfully!")
-                    st.info("You can now ask questions in the main panel.")
+                    st.success("✅ Documents processed successfully!")
+                    st.info("Ask questions in the main panel now.")
                 else:
-                    st.error("Failed to process documents. Please check your API credentials in the .env file and try again.")
+                    st.error("❌ Failed to process documents. Check your API keys and try again.")
         else:
-            st.warning("Please upload at least one PDF file before processing.")
+            st.warning("⚠️ Please upload at least one PDF before processing.")
 
+st.title("📚 StudyMate: AI-Powered PDF Q&A")
+st.write("---")
 
-# --------------------------------------------------------------------------
-# 4. MAIN APPLICATION LAYOUT
-# --------------------------------------------------------------------------
-st.title("📚 StudyMate: AI-Powered PDF Q&A System")
-st.markdown("---")
-
-# Display the question-answering interface only if documents are processed
 if st.session_state.processed_data:
-    st.header("Ask a Question")
-    query = st.text_input(
-        "Enter your question based on the uploaded content:", 
-        key="query_input",
-        placeholder="e.g., What is overfitting in machine learning?"
-    )
+    st.header("💬 Ask a Question")
+    
+    with st.form(key="query_form", clear_on_submit=True):
+        query = st.text_area(
+            "Enter your question about the uploaded documents:",
+            placeholder="E.g., What is overfitting in machine learning?",
+            height=80
+        )
+        get_answer_btn = st.form_submit_button("Get Answer")
 
-    if st.button("Get Answer", type="primary"):
-        if query:
-            with st.spinner("Searching for the answer..."):
-                # Retrieve processed data
+    if get_answer_btn:
+        if query.strip():
+            with st.spinner("Searching for answers..."):
                 data = st.session_state.processed_data
-                
-                # Retrieve relevant context
-                relevant_chunks = retrieve_relevant_chunks(
-                    query, data["faiss_index"], data["text_chunks"]
-                )
+                relevant_chunks = retrieve_relevant_chunks(query, data["faiss_index"], data["text_chunks"])
                 
                 if not relevant_chunks:
-                    st.warning("Could not find relevant information in the documents to answer this question.")
+                    st.warning("No relevant info found in the documents to answer this.")
                 else:
-                    # Generate the answer using the LLM
                     answer = get_llm_answer(query, relevant_chunks)
-                    
-                    # Store the Q&A pair and its context in history
                     st.session_state.qa_history.insert(0, {
                         "question": query,
                         "answer": answer,
                         "context": relevant_chunks
                     })
-                    
-                    # Rerun to clear the input box and display the new answer
-                    st.rerun()
+                    st.experimental_rerun()
         else:
             st.warning("Please enter a question.")
 else:
-    st.info("Please upload and process your documents using the sidebar to begin.")
+    st.info("Upload and process PDFs on the sidebar to get started.")
 
-
-# --------------------------------------------------------------------------
-# 5. DISPLAY Q&A HISTORY
-# --------------------------------------------------------------------------
 if st.session_state.qa_history:
-    st.markdown("---")
-    st.header("Conversation History")
-    
+    st.write("---")
+    st.header("📝 Conversation History")
     for i, item in enumerate(st.session_state.qa_history):
-        with st.container():
-            st.markdown(f"**Q: {item['question']}**")
-            st.markdown(f"**A:** {item['answer']}")
-            
-            with st.expander("Show Referenced Paragraphs"):
-                for j, context_chunk in enumerate(item['context']):
-                    st.markdown(f"**Reference {j+1}:**\n> {context_chunk}")
-            
-            st.markdown("---")
+        with st.expander(f"Q{i+1}: {item['question']}", expanded=False):
+            st.write(f"**Answer:** {item['answer']}")
+            with st.expander("Referenced Paragraphs"):
+                for j, chunk in enumerate(item["context"], 1):
+                    st.markdown(f"> {chunk}")
