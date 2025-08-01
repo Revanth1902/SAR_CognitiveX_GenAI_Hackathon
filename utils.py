@@ -1,19 +1,31 @@
-import fitz #for pdf open nd read
-from sentence_transformers import SentenceTransformer #convert text to vectors
-import faiss #serach for vectors similarty
-import numpy as np #work with arrays
-from ibm_watsonx_ai.foundation_models import ModelInference #ibmmodel
-import os #read environment variables, paths
-from dotenv import load_dotenv #to get env
-import traceback #debugging
+import fitz  # PyMuPDF
+from sentence_transformers import SentenceTransformer
+import faiss
+import numpy as np
+from ibm_watsonx_ai.foundation_models import ModelInference
+import os
+from dotenv import load_dotenv
+import traceback
+from collections import Counter
+import spacy
+from collections import Counter
+from string import punctuation
+from spacy.lang.en.stop_words import STOP_WORDS
+
+nlp = spacy.load("en_core_web_sm")
+import spacy
 
 load_dotenv()
 
 llm_model = None
 embedding_model = None
+
+
+nlp = spacy.load("en_core_web_sm")
+
 try:
     print("--> Initializing embedding model...")
-    embedding_model = SentenceTransformer('all-MiniLM-L6-v2') # turns text into vectors 
+    embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
     print("--> Embedding model initialized.")
 
     print("--> Loading Watsonx credentials...")
@@ -33,7 +45,6 @@ try:
     }
 
     print("--> Initializing Watsonx LLM...")
-    # --- CHANGE 2: Use ModelInference instead of Model ---
     llm_model = ModelInference(
         model_id=model_id,
         params=generation_params,
@@ -43,14 +54,13 @@ try:
     print("--> SUCCESS: Watsonx LLM initialized!")
 
 except Exception:
-    print("\n\n" + "="*50)
+    print("\n\n" + "=" * 50)
     print("      AN ERROR OCCURRED DURING INITIALIZATION")
-    print("="*50)
+    print("=" * 50)
     traceback.print_exc()
-    print("="*50 + "\n\n")
+    print("=" * 50 + "\n\n")
 
 
-#take all pdfs and reach each and extrct all text into a large string and returns in it 
 def extract_text_from_pdfs(pdf_files):
     full_text = ""
     for pdf_file in pdf_files:
@@ -60,9 +70,7 @@ def extract_text_from_pdfs(pdf_files):
         doc.close()
     return full_text
 
-# Returns a list of these chunks.
 
-#long textt splited into small pices and overlap and return list
 def chunk_text(text, chunk_size=500, overlap=100):
     words = text.split()
     if not words:
@@ -74,9 +82,7 @@ def chunk_text(text, chunk_size=500, overlap=100):
     return chunks
 
 
-#the list (chunks) and use model to convert into vector and use faiss to create index and return index and array 
 def create_embeddings_and_index(chunks):
-    """Creates embeddings for text chunks and builds a FAISS index."""
     if not chunks or not embedding_model:
         return None, None
     try:
@@ -89,28 +95,24 @@ def create_embeddings_and_index(chunks):
         print(f"Error creating embeddings or FAISS index: {e}")
         return None, None
 
-#serached quey go as input and using the faiss most relevant chunk is returned
+
 def retrieve_relevant_chunks(query, index, chunks, top_k=3):
-    
     if not query or index is None or not embedding_model:
         return []
     try:
         query_embedding = embedding_model.encode([query])
         distances, indices = index.search(np.array(query_embedding, dtype=np.float32), top_k)
-        
         valid_indices = [i for i in indices[0] if i < len(chunks)]
-        retrieved_chunks = [chunks[i] for i in valid_indices]
-        return retrieved_chunks
+        return [chunks[i] for i in valid_indices]
     except Exception as e:
         print(f"Error during chunk retrieval: {e}")
         return []
 
-#building a prompt with context(chunks) and query
+
 def construct_prompt(query, context_chunks):
-    """Constructs the prompt for the LLM with context and instructions."""
     context = "\n\n".join(context_chunks)
     prompt = f"""
-    Answer the following question based only on the provided context. If the context does not contain the answer, state that the information is not available in the provided documents. Use External Knowledge if realted info found else do not use any external knowledge.
+    Answer the following question based only on the provided context. If the context does not contain the answer, state that the information is not available in the provided documents. Use External Knowledge if related info found else do not use any external knowledge.
 
     Context:
     {context}
@@ -122,17 +124,70 @@ def construct_prompt(query, context_chunks):
     return prompt
 
 
-#sends the prompt to the Watsonx LLM to get a generated answer
 def get_llm_answer(query, context_chunks):
-   
     if not llm_model:
-        return "Error: LLM model could not be initialized. Please check the terminal logs for the detailed error message."
-    
+        return "Error: LLM model could not be initialized."
     prompt = construct_prompt(query, context_chunks)
     try:
         response = llm_model.generate_text(prompt=prompt)
         return response.strip()
-    except Exception as e:
-        print("Error during LLM call:")
+    except Exception:
         traceback.print_exc()
-        return f"An error occurred while communicating with the LLM. Please check the terminal logs."
+        return "An error occurred while communicating with the LLM."
+
+
+# === New Features ===
+def summarize_text(text, max_chars=2000):
+    if not llm_model:
+        return "Error: LLM model not initialized."
+    if not text.strip():
+        return "No text to summarize."
+    
+    text = text[:max_chars]
+    prompt = f"""
+    Summarize the following text in a concise and clear manner:
+
+    {text}
+
+    Summary:
+    """
+    try:
+        summary = llm_model.generate_text(prompt=prompt)
+        return summary.strip()
+    except Exception:
+        traceback.print_exc()
+        return "An error occurred while generating the summary."
+
+
+
+def extract_glossary_terms(text, top_n=10):
+    doc = nlp(text)
+    terms = []
+
+    for chunk in doc.noun_chunks:
+        chunk_text = chunk.text.strip().lower()
+        # Remove single-word stopwords and short tokens
+        if chunk.root.pos_ in ["NOUN", "PROPN"] and len(chunk_text) > 2:
+            if chunk_text not in STOP_WORDS and not all(char in punctuation for char in chunk_text):
+                terms.append(chunk_text)
+
+    freq = Counter(terms)
+    return [term for term, _ in freq.most_common(top_n)]
+
+def get_pdf_statistics(text):
+    words = [word.lower() for word in text.split()]
+    filtered_words = [
+        word.strip(".,;:!?()[]{}\"'") for word in words
+        if word.lower() not in STOP_WORDS and word.isalpha()
+    ]
+
+    total_words = len(filtered_words)
+    unique_words = len(set(filtered_words))
+    top_words = Counter(filtered_words).most_common(10)
+
+    return {
+        "Word Count": total_words,
+        "Unique Words": unique_words,
+        "Top 10 Words": top_words
+    }
+
