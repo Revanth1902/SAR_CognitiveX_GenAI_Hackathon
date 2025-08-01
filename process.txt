@@ -1,0 +1,298 @@
+Of course. Here is a step-by-step guide with code snippets to help you complete the "StudyMate" hackathon project.
+
+Milestone 1: PDF Parsing and Chunk Preparation
+
+This initial phase focuses on extracting text from uploaded PDF files and breaking it down into smaller, manageable chunks.
+
+Activity 1.1: Text Extraction from PDFs
+
+First, you'll need to use the PyMuPDF library to read and extract text from the PDF files.
+
+Installation:
+
+Generated bash
+pip install PyMuPDF
+
+
+Code:
+
+Generated python
+import fitz # PyMuPDF
+
+def extract_text_from_pdf(pdf_file):
+    doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
+    text = ""
+    for page in doc:
+        text += page.get_text()
+    doc.close()
+    return text
+IGNORE_WHEN_COPYING_START
+content_copy
+download
+Use code with caution.
+Python
+IGNORE_WHEN_COPYING_END
+
+Activity 1.2: Chunk Segmentation
+
+Next, the extracted text is segmented into overlapping chunks to maintain context.
+
+Code:
+
+Generated python
+def chunk_text(text, chunk_size=500, overlap=100):
+    words = text.split()
+    chunks = []
+    for i in range(0, len(words), chunk_size - overlap):
+        chunks.append(" ".join(words[i:i + chunk_size]))
+    return chunks
+IGNORE_WHEN_COPYING_START
+content_copy
+download
+Use code with caution.
+Python
+IGNORE_WHEN_COPYING_END
+Milestone 2: Embedding, Indexing, and Retrieval
+
+This milestone is about converting the text chunks into numerical representations (embeddings) and indexing them for efficient searching.
+
+Activity 2.1: Embedding Generation
+
+The sentence-transformers library is used to create embeddings for each text chunk.
+
+Installation:
+
+Generated bash
+pip install sentence-transformers
+IGNORE_WHEN_COPYING_START
+content_copy
+download
+Use code with caution.
+Bash
+IGNORE_WHEN_COPYING_END
+
+Code:
+
+Generated python
+from sentence_transformers import SentenceTransformer
+
+embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+
+def get_embeddings(chunks):
+    embeddings = embedding_model.encode(chunks)
+    return embeddings
+IGNORE_WHEN_COPYING_START
+content_copy
+download
+Use code with caution.
+Python
+IGNORE_WHEN_COPYING_END
+
+Activity 2.2: FAISS Index Construction
+
+FAISS (Facebook AI Similarity Search) is used to index the embeddings for fast retrieval.
+
+Installation:
+
+Generated bash
+pip install faiss-cpu
+IGNORE_WHEN_COPYING_START
+content_copy
+download
+Use code with caution.
+Bash
+IGNORE_WHEN_COPYING_END
+
+Code:
+
+Generated python
+import faiss
+import numpy as np
+
+def create_faiss_index(embeddings):
+    dimension = embeddings.shape[1]
+    index = faiss.IndexFlatL2(dimension)
+    index.add(np.array(embeddings, dtype=np.float32))
+    return index
+IGNORE_WHEN_COPYING_START
+content_copy
+download
+Use code with caution.
+Python
+IGNORE_WHEN_COPYING_END
+
+Activity 2.3: Query Embedding and Chunk Retrieval
+
+When a user asks a question, it is also embedded, and FAISS is used to find the most relevant text chunks.
+
+Code:
+
+Generated python
+def retrieve_chunks(query, index, chunks, top_k=3):
+    query_embedding = embedding_model.encode([query])
+    distances, indices = index.search(np.array(query_embedding, dtype=np.float32), top_k)
+    retrieved_chunks = [chunks[i] for i in indices[0]]
+    return retrieved_chunks
+IGNORE_WHEN_COPYING_START
+content_copy
+download
+Use code with caution.
+Python
+IGNORE_WHEN_COPYING_END
+Milestone 3: Watsonx LLM Integration and Prompt Construction
+
+This milestone involves sending the retrieved information to the IBM Watsonx LLM to generate an answer.
+
+Activity 3.1: IBM Credential Setup
+
+You'll need to set up your IBM Watsonx credentials.
+
+Installation:
+
+Generated bash
+pip install ibm-watsonx-ai python-dotenv
+IGNORE_WHEN_COPYING_START
+content_copy
+download
+Use code with caution.
+Bash
+IGNORE_WHEN_COPYING_END
+
+Code (.env file):
+
+Generated code
+IBM_API_KEY="your_api_key"
+IBM_PROJECT_ID="your_project_id"
+IBM_URL="your_watsonx_url"
+IGNORE_WHEN_COPYING_START
+content_copy
+download
+Use code with caution.
+IGNORE_WHEN_COPYING_END
+
+Activity 3.2: Prompt Construction
+
+A prompt is created by combining the user's question with the retrieved text chunks.
+
+Code:
+
+Generated python
+def construct_prompt(query, context_chunks):
+    prompt = "Answer based strictly on the following context:\n\n"
+    for chunk in context_chunks:
+        prompt += f"- {chunk}\n"
+    prompt += f"\nQuestion: {query}\nAnswer:"
+    return prompt
+IGNORE_WHEN_COPYING_START
+content_copy
+download
+Use code with caution.
+Python
+IGNORE_WHEN_COPYING_END
+
+Activity 3.3: Model Invocation
+
+The ibm-watsonx-ai SDK is used to send the prompt to the model and get a response.
+
+Code:
+
+Generated python
+from ibm_watsonx_ai.foundation_models import Model
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+def get_llm_response(prompt):
+    model = Model(
+        model_id='mistralai/mixtral-8x7b-instruct-v01',
+        params={
+            "decoding_method": "greedy",
+            "max_new_tokens": 300,
+            "temperature": 0.5,
+        },
+        credentials={
+            "apikey": os.getenv("IBM_API_KEY"),
+            "url": os.getenv("IBM_URL")
+        },
+        project_id=os.getenv("IBM_PROJECT_ID")
+    )
+    response = model.generate_text(prompt=prompt)
+    return response
+IGNORE_WHEN_COPYING_START
+content_copy
+download
+Use code with caution.
+Python
+IGNORE_WHEN_COPYING_END
+Milestone 4: Streamlit Interface Development
+
+The final milestone is to build the user interface using Streamlit.
+
+Installation:
+
+Generated bash
+pip install streamlit
+IGNORE_WHEN_COPYING_START
+content_copy
+download
+Use code with caution.
+Bash
+IGNORE_WHEN_COPYING_END
+
+Code (app.py):
+
+Generated python
+import streamlit as st
+
+st.set_page_config(page_title="StudyMate", layout="wide")
+
+st.title("StudyMate: An AI-Powered PDF Q&A System")
+
+uploaded_files = st.file_uploader("Upload your PDF files", type="pdf", accept_multiple_files=True)
+
+if uploaded_files:
+    all_text = ""
+    for pdf_file in uploaded_files:
+        all_text += extract_text_from_pdf(pdf_file)
+    
+    text_chunks = chunk_text(all_text)
+    chunk_embeddings = get_embeddings(text_chunks)
+    faiss_index = create_faiss_index(chunk_embeddings)
+
+    st.success(f"{len(uploaded_files)} file(s) processed successfully!")
+
+    query = st.text_input("Ask a question about your documents:")
+
+    if st.button("Submit"):
+        if query:
+            retrieved = retrieve_chunks(query, faiss_index, text_chunks)
+            prompt = construct_prompt(query, retrieved)
+            answer = get_llm_response(prompt)
+            
+            st.subheader("Answer:")
+            st.write(answer)
+
+            with st.expander("Referenced Paragraphs"):
+                for i, chunk in enumerate(retrieved):
+                    st.write(f"**Reference {i+1}:**")
+                    st.write(chunk)
+        else:
+            st.warning("Please enter a question.")
+IGNORE_WHEN_COPYING_START
+content_copy
+download
+Use code with caution.
+Python
+IGNORE_WHEN_COPYING_END
+
+To run the application, save the final code as app.py and execute the following command in your terminal:
+
+Generated bash
+streamlit run app.py
+IGNORE_WHEN_COPYING_START
+content_copy
+download
+Use code with caution.
+Bash
+IGNORE_WHEN_COPYING_END
