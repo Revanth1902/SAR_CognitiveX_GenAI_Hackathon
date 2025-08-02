@@ -10,13 +10,13 @@ from utils import (
     summarize_text,
     extract_glossary_terms,
     get_pdf_statistics,
-    initialize_models # Import the new initialization function
+    initialize_models # We still import it
 )
 
 st.set_page_config(page_title="StudyMate AI", page_icon="📚", layout="wide")
 
-# Initialize models and cache them
-initialize_models()
+# DO NOT initialize models here anymore.
+# initialize_models()
 
 def enhanced_css():
     st.markdown("""
@@ -99,6 +99,8 @@ if "qa_history" not in st.session_state:
     st.session_state.qa_history = []
 if "processed_data" not in st.session_state:
     st.session_state.processed_data = None
+if "models_initialized" not in st.session_state:
+    st.session_state.models_initialized = False
 
 # === Sidebar ===
 with st.sidebar:
@@ -112,6 +114,13 @@ with st.sidebar:
 
     if process_btn:
         if uploaded_files:
+            # *** THIS IS THE CRITICAL CHANGE ***
+            # Load models only when the button is clicked for the first time.
+            if not st.session_state.models_initialized:
+                with st.spinner("Initializing AI models for the first time. This may take a minute..."):
+                    initialize_models()
+                    st.session_state.models_initialized = True
+            
             with st.spinner("⏳ Analyzing and chunking your documents..."):
                 raw_text = extract_text_from_pdfs(uploaded_files)
                 text_chunks = chunk_text(raw_text)
