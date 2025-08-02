@@ -9,11 +9,14 @@ from utils import (
     get_llm_answer,
     summarize_text,
     extract_glossary_terms,
-    get_pdf_statistics
+    get_pdf_statistics,
+    initialize_models # Import the new initialization function
 )
 
 st.set_page_config(page_title="StudyMate AI", page_icon="📚", layout="wide")
-port = int(os.environ.get("PORT", 8501))
+
+# Initialize models and cache them
+initialize_models()
 
 def enhanced_css():
     st.markdown("""

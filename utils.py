@@ -8,58 +8,68 @@ from dotenv import load_dotenv
 import traceback
 from collections import Counter
 import spacy
-from collections import Counter
 from string import punctuation
 from spacy.lang.en.stop_words import STOP_WORDS
-
-nlp = spacy.load("en_core_web_sm")
-import spacy
+import streamlit as st
 
 load_dotenv()
 
-llm_model = None
-embedding_model = None
-
-
-nlp = spacy.load("en_core_web_sm")
-
-try:
+# Use Streamlit's cache_resource to load models only once
+@st.cache_resource
+def get_embedding_model():
     print("--> Initializing embedding model...")
-    embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+    model = SentenceTransformer('all-MiniLM-L6-v2')
     print("--> Embedding model initialized.")
+    return model
 
+@st.cache_resource
+def get_llm_model():
     print("--> Loading Watsonx credentials...")
-    watsonx_credentials = {
-        "apikey": os.getenv("IBM_API_KEY"),
-        "url": os.getenv("IBM_URL")
-    }
-    project_id = os.getenv("IBM_PROJECT_ID")
-    print("--> Credentials loaded.")
+    try:
+        watsonx_credentials = {
+            "apikey": os.getenv("IBM_API_KEY"),
+            "url": os.getenv("IBM_URL")
+        }
+        project_id = os.getenv("IBM_PROJECT_ID")
+        print("--> Credentials loaded.")
 
-    model_id = 'ibm/granite-13b-instruct-v2'
+        model_id = 'ibm/granite-13b-instruct-v2'
 
-    generation_params = {
-        "decoding_method": "greedy",
-        "max_new_tokens": 300,
-        "temperature": 0.5,
-    }
+        generation_params = {
+            "decoding_method": "greedy",
+            "max_new_tokens": 300,
+            "temperature": 0.5,
+        }
 
-    print("--> Initializing Watsonx LLM...")
-    llm_model = ModelInference(
-        model_id=model_id,
-        params=generation_params,
-        credentials=watsonx_credentials,
-        project_id=project_id
-    )
-    print("--> SUCCESS: Watsonx LLM initialized!")
+        print("--> Initializing Watsonx LLM...")
+        llm = ModelInference(
+            model_id=model_id,
+            params=generation_params,
+            credentials=watsonx_credentials,
+            project_id=project_id
+        )
+        print("--> SUCCESS: Watsonx LLM initialized!")
+        return llm
+    except Exception as e:
+        print("\n\n" + "=" * 50)
+        print("      AN ERROR OCCURRED DURING LLM INITIALIZATION")
+        print(f"Error: {e}")
+        print("=" * 50)
+        traceback.print_exc()
+        print("=" * 50 + "\n\n")
+        return None
 
-except Exception:
-    print("\n\n" + "=" * 50)
-    print("      AN ERROR OCCURRED DURING INITIALIZATION")
-    print("=" * 50)
-    traceback.print_exc()
-    print("=" * 50 + "\n\n")
+@st.cache_resource
+def get_spacy_model():
+    print("--> Initializing spaCy model...")
+    nlp = spacy.load("en_core_web_sm")
+    print("--> spaCy model initialized.")
+    return nlp
 
+def initialize_models():
+    get_embedding_model()
+    get_llm_model()
+    get_spacy_model()
 
 def extract_text_from_pdfs(pdf_files):
     full_text = ""
@@ -83,6 +93,7 @@ def chunk_text(text, chunk_size=500, overlap=100):
 
 
 def create_embeddings_and_index(chunks):
+    embedding_model = get_embedding_model()
     if not chunks or not embedding_model:
         return None, None
     try:
@@ -97,6 +108,7 @@ def create_embeddings_and_index(chunks):
 
 
 def retrieve_relevant_chunks(query, index, chunks, top_k=3):
+    embedding_model = get_embedding_model()
     if not query or index is None or not embedding_model:
         return []
     try:
@@ -125,6 +137,7 @@ def construct_prompt(query, context_chunks):
 
 
 def get_llm_answer(query, context_chunks):
+    llm_model = get_llm_model()
     if not llm_model:
         return "Error: LLM model could not be initialized."
     prompt = construct_prompt(query, context_chunks)
@@ -138,6 +151,7 @@ def get_llm_answer(query, context_chunks):
 
 # === New Features ===
 def summarize_text(text, max_chars=2000):
+    llm_model = get_llm_model()
     if not llm_model:
         return "Error: LLM model not initialized."
     if not text.strip():
@@ -161,6 +175,7 @@ def summarize_text(text, max_chars=2000):
 
 
 def extract_glossary_terms(text, top_n=10):
+    nlp = get_spacy_model()
     doc = nlp(text)
     terms = []
 
@@ -190,4 +205,3 @@ def get_pdf_statistics(text):
         "Unique Words": unique_words,
         "Top 10 Words": top_words
     }
-

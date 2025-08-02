@@ -1,7 +1,9 @@
 streamlit
-PyMuPDF
-sentence-transformers
+numpy
 faiss-cpu
+sentence-transformers
 ibm-watsonx-ai
 python-dotenv
-numpy
+spacy
+fitz
+PyMuPDF
