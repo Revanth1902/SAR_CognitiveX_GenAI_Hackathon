@@ -11,10 +11,20 @@ import spacy
 from string import punctuation
 from spacy.lang.en.stop_words import STOP_WORDS
 import streamlit as st
+import subprocess
+import sys
 
 load_dotenv()
 
-# Use Streamlit's cache_resource to load models only once
+def ensure_spacy_model():
+    model_name = "en_core_web_sm"
+    try:
+        return spacy.load(model_name)
+    except OSError:
+        print(f"Model '{model_name}' not found. Downloading...")
+        subprocess.check_call([sys.executable, "-m", "spacy", "download", model_name])
+        return spacy.load(model_name)
+
 @st.cache_resource
 def get_embedding_model():
     print("--> Initializing embedding model...")
@@ -62,7 +72,7 @@ def get_llm_model():
 @st.cache_resource
 def get_spacy_model():
     print("--> Initializing spaCy model...")
-    nlp = spacy.load("en_core_web_sm")
+    nlp = ensure_spacy_model()
     print("--> spaCy model initialized.")
     return nlp
 
@@ -80,7 +90,6 @@ def extract_text_from_pdfs(pdf_files):
         doc.close()
     return full_text
 
-
 def chunk_text(text, chunk_size=500, overlap=100):
     words = text.split()
     if not words:
@@ -90,7 +99,6 @@ def chunk_text(text, chunk_size=500, overlap=100):
         chunk = " ".join(words[i:i + chunk_size])
         chunks.append(chunk)
     return chunks
-
 
 def create_embeddings_and_index(chunks):
     embedding_model = get_embedding_model()
@@ -106,7 +114,6 @@ def create_embeddings_and_index(chunks):
         print(f"Error creating embeddings or FAISS index: {e}")
         return None, None
 
-
 def retrieve_relevant_chunks(query, index, chunks, top_k=3):
     embedding_model = get_embedding_model()
     if not query or index is None or not embedding_model:
@@ -119,7 +126,6 @@ def retrieve_relevant_chunks(query, index, chunks, top_k=3):
     except Exception as e:
         print(f"Error during chunk retrieval: {e}")
         return []
-
 
 def construct_prompt(query, context_chunks):
     context = "\n\n".join(context_chunks)
@@ -135,7 +141,6 @@ def construct_prompt(query, context_chunks):
     """
     return prompt
 
-
 def get_llm_answer(query, context_chunks):
     llm_model = get_llm_model()
     if not llm_model:
@@ -148,15 +153,13 @@ def get_llm_answer(query, context_chunks):
         traceback.print_exc()
         return "An error occurred while communicating with the LLM."
 
-
-# === New Features ===
 def summarize_text(text, max_chars=2000):
     llm_model = get_llm_model()
     if not llm_model:
         return "Error: LLM model not initialized."
     if not text.strip():
         return "No text to summarize."
-    
+
     text = text[:max_chars]
     prompt = f"""
     Summarize the following text in a concise and clear manner:
@@ -172,8 +175,6 @@ def summarize_text(text, max_chars=2000):
         traceback.print_exc()
         return "An error occurred while generating the summary."
 
-
-
 def extract_glossary_terms(text, top_n=10):
     nlp = get_spacy_model()
     doc = nlp(text)
@@ -181,7 +182,6 @@ def extract_glossary_terms(text, top_n=10):
 
     for chunk in doc.noun_chunks:
         chunk_text = chunk.text.strip().lower()
-        # Remove single-word stopwords and short tokens
         if chunk.root.pos_ in ["NOUN", "PROPN"] and len(chunk_text) > 2:
             if chunk_text not in STOP_WORDS and not all(char in punctuation for char in chunk_text):
                 terms.append(chunk_text)
