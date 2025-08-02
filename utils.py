@@ -16,14 +16,13 @@ import sys
 
 load_dotenv()
 
-def ensure_spacy_model():
-    model_name = "en_core_web_sm"
-    try:
-        return spacy.load(model_name)
-    except OSError:
-        print(f"Model '{model_name}' not found. Downloading...")
-        subprocess.check_call([sys.executable, "-m", "spacy", "download", model_name])
-        return spacy.load(model_name)
+def extract_glossary_terms(text, top_n=10):
+    nlp = get_spacy_model()
+    if nlp is None:
+        raise RuntimeError("spaCy model not loaded. Cannot process text.")
+    doc = nlp(text)
+    # ... rest of your code ...
+
 
 @st.cache_resource
 def get_embedding_model():
@@ -72,9 +71,19 @@ def get_llm_model():
 @st.cache_resource
 def get_spacy_model():
     print("--> Initializing spaCy model...")
-    nlp = ensure_spacy_model()
-    print("--> spaCy model initialized.")
-    return nlp
+    try:
+        nlp = spacy.load("./models/en_core_web_sm")
+        print("--> spaCy model initialized from local models folder.")
+        return nlp
+    except OSError:
+        print("Could not load local 'en_core_web_sm'. Trying global model...")
+        try:
+            nlp = spacy.load("en_core_web_sm")
+            print("--> spaCy model initialized from global installation.")
+            return nlp
+        except OSError:
+            print("Global spaCy model not found either. Please install it.")
+            return None
 
 def initialize_models():
     get_embedding_model()

@@ -21,74 +21,40 @@ st.set_page_config(page_title="StudyMate AI", page_icon="📚", layout="wide")
 def enhanced_css():
     st.markdown("""
     <style>
-    html, body, .main {
-        background-color: #d6d3d4 !important;
-        color: #e0e0e0;
-        font-family: 'Segoe UI', sans-serif;
+    .main {
+        background-color: #f0f2f6;
     }
-    p{
-                color:#d6d3d4}
-    h1, h2, h3, h4 {
-        color: #26b170;
+    h1, h2, h3 {
+        color: #003C5F;
     }
-
-    .block-container {
-        padding: 2rem 2rem;
-                
+    .stButton>button {
+        background-color: #26b170;
+        color: white;
+        border-radius: 12px;
+        padding: 10px 20px;
+        border: none;
+        font-weight: bold;
+        width: 100%;
     }
-
+    .stButton>button:hover {
+        background-color: #34d399;
+    }
     [data-testid="stSidebar"] {
         background-color: #003C5F;
-        color: whitesmoke;
     }
-
-    div.stButton  {
-    background: linear-gradient(90deg, #26b170, #34d399);
-    color: black;
-    border: none;
-    border-radius: 12px;
-    padding: 12px 24px;
-    font-size: 16px;
-    font-weight: 600;
-    box-shadow: 0px 4px 15px rgba(38, 177, 112, 0.3);
-    cursor: pointer;
-    transition: all 0.3s ease-in-out;
-    animation: pulseGlow 2s infinite;
-    width: 100%;
-}
-
-div.stButton {
-    transform: scale(1.05);
-    background: linear-gradient(90deg, #34d399, #26b170);
-    box-shadow: 0px 6px 20px rgba(52, 211, 153, 0.4);
-}
-
-
-    textarea, input[type="text"] {
-        background-color: #1e1e1e;
-        color: #e0e0e0;
-        border: 1px solid #34d399;
-        border-radius: 6px;
-        padding: 10px;
-        width: 100%;
-        resize: vertical;
+    .section-box {
+        # background-color: white;
+        padding: 1.5rem;
+        border-radius: 10px;
+        # box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        # margin-bottom: 1rem;
+        # height: 350px; /* Fixed height for alignment */
     }
-
-    .divider {
-        margin: 2rem 0;
-        height: 1px;
-        background: linear-gradient(to right, #34d399, #26b170);
-        border: none;
-    }
-
-    
     .scrollable {
         overflow-y: auto;
         max-height: 250px;
-        padding-right: 0.5rem;
+        padding-right: 1rem;
     }
-
-
     </style>
     """, unsafe_allow_html=True)
 

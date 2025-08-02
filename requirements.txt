@@ -1,8 +1,8 @@
+# requirements.txt
+
 streamlit
-numpy
-faiss-cpu
-sentence-transformers
-ibm-watsonx-ai
 python-dotenv
-spacy
+sentence-transformers
+faiss-cpu
+ibm-watsonx-ai
 PyMuPDF
