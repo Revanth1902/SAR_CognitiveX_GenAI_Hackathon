@@ -6,3 +6,4 @@ sentence-transformers
 faiss-cpu
 ibm-watsonx-ai
 PyMuPDF
+spacy
